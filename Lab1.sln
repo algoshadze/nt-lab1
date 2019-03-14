@@ -7,6 +7,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Server", "Server\Server.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Client", "Client\Client.vcxproj", "{55FE66B1-2215-4B16-B5AE-E5F1F9BF21C3}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "doc", "doc", "{87D7C308-4F62-4BEA-836F-23E30E9BD7B1}"
+	ProjectSection(SolutionItems) = preProject
+		doc\Задание.jpg = doc\Задание.jpg
+		doc\Индивидуальное.jpg = doc\Индивидуальное.jpg
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
