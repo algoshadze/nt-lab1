@@ -4,6 +4,8 @@
 #include "stdafx.h"
 #include "Client.h"
 
+using namespace std;
+
 #define MAX_LOADSTRING 100
 
 // Глобальные переменные:
@@ -150,45 +152,45 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
 	{
-	case WM_COMMAND:
-	{
-		int wmId = LOWORD(wParam);
-		// Разобрать выбор в меню:
-		switch (wmId)
+		case WM_COMMAND:
 		{
-		case IDM_ABOUT:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-			break;
-		case IDM_SETTINGS:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTINGS), hWnd, Settings);
-			break;
-		case IDM_REQUEST:
-			break;
-		case IDM_PRICECHANGE:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_PRICE_CHANGE), hWnd, PriceChange);
-			break;
-		case IDM_EXIT:
-			DestroyWindow(hWnd);
+			int wmId = LOWORD(wParam);
+			// Разобрать выбор в меню:
+			switch (wmId)
+			{
+				case IDM_ABOUT:
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+					break;
+				case IDM_SETTINGS:
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTINGS), hWnd, Settings);
+					break;
+				case IDM_REQUEST:
+					break;
+				case IDM_PRICECHANGE:
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_PRICE_CHANGE), hWnd, PriceChange);
+					break;
+				case IDM_EXIT:
+					DestroyWindow(hWnd);
+					break;
+				default:
+					return DefWindowProc(hWnd, message, wParam, lParam);
+			}
+		}
+		break;
+		case WM_PAINT:
+		{
+			PAINTSTRUCT ps;
+			HDC hdc = BeginPaint(hWnd, &ps);
+			// TODO: Добавьте сюда любой код прорисовки, использующий HDC...
+			EndPaint(hWnd, &ps);
+		}
+		break;
+		case WM_DESTROY:
+			WSACleanup();
+			PostQuitMessage(0);
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
-		}
-	}
-	break;
-	case WM_PAINT:
-	{
-		PAINTSTRUCT ps;
-		HDC hdc = BeginPaint(hWnd, &ps);
-		// TODO: Добавьте сюда любой код прорисовки, использующий HDC...
-		EndPaint(hWnd, &ps);
-	}
-	break;
-	case WM_DESTROY:
-		WSACleanup();
-		PostQuitMessage(0);
-		break;
-	default:
-		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
 }
@@ -199,16 +201,16 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	UNREFERENCED_PARAMETER(lParam);
 	switch (message)
 	{
-	case WM_INITDIALOG:
-		return (INT_PTR)TRUE;
-
-	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-		{
-			EndDialog(hDlg, LOWORD(wParam));
+		case WM_INITDIALOG:
 			return (INT_PTR)TRUE;
-		}
-		break;
+
+		case WM_COMMAND:
+			if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+			{
+				EndDialog(hDlg, LOWORD(wParam));
+				return (INT_PTR)TRUE;
+			}
+			break;
 	}
 	return (INT_PTR)FALSE;
 }
@@ -218,14 +220,46 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 	UNREFERENCED_PARAMETER(lParam);
 	switch (message)
 	{
-	case WM_INITDIALOG:
+		case WM_INITDIALOG:
+		{
+			//Полчаем дескриптор комбобокса
+			HWND hItemsCombo = GetDlgItem(hDlg, IDCB_ITEMS);
+			//Добавляем строку в комбо
+			SendMessage(hItemsCombo, CB_ADDSTRING, 0, (LPARAM)L"Тут какой то товар");
+			//Добавляем еще строку в комбо
+			SendMessage(hItemsCombo, CB_ADDSTRING, 0, (LPARAM)L"Тут другой товар");
+			//Выделяем, к примеру вторую строку 
+			SendMessage(hItemsCombo, CB_SETCURSEL, (WPARAM)1, 0);
+		}
 		return (INT_PTR)TRUE;
 
-	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+		case WM_COMMAND:
 		{
-			EndDialog(hDlg, LOWORD(wParam));
-			return (INT_PTR)TRUE;
+			//Полчаем дескриптор комбобокса для проверки источника сообщения
+			HWND hItemsCombo = GetDlgItem(hDlg, IDCB_ITEMS);
+			if ((HWND)lParam == hItemsCombo) //Это сообщение от комбо
+			{
+				if (HIWORD(wParam) == CBN_SELCHANGE)  //Это сообщение об изменении выбранного товара
+				{
+					//Берем выбранный индекс
+					int itemIndex = (int) SendMessage(hItemsCombo, CB_GETCURSEL,
+						(WPARAM)0, (LPARAM)0);
+					//Для примера выводим в сообщении
+					wstring msg(L"Выбран элемент с индексом ");
+					msg = msg.append(to_wstring(itemIndex));
+					MessageBox(hDlg, msg.c_str(), L"Информация", MB_OK);
+				}
+				return (INT_PTR)TRUE;
+			}
+			else if (LOWORD(wParam) == IDOK )
+			{
+				EndDialog(hDlg, LOWORD(wParam));
+				return (INT_PTR)TRUE;
+			}
+			else if (LOWORD(wParam) == IDCANCEL) {
+				EndDialog(hDlg, LOWORD(wParam));
+				return (INT_PTR)TRUE;
+			}
 		}
 		break;
 	}
@@ -239,39 +273,37 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	switch (message)
 	{
-	case WM_INITDIALOG:
-		SetDlgItemInt(hDlg, IDTB_PORT, _port, false);
-		InetNtopW(AF_INET, &_address, addressText, 16);
-		SetDlgItemText(hDlg, IDTB_ADRESS, addressText);
-		return (INT_PTR)TRUE;
+		case WM_INITDIALOG:
+			SetDlgItemInt(hDlg, IDTB_PORT, _port, false);
+			InetNtopW(AF_INET, &_address, addressText, 16);
+			SetDlgItemText(hDlg, IDTB_ADRESS, addressText);
+			return (INT_PTR)TRUE;
 
-	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK)
-		{
-
-			GetDlgItemText(hDlg, IDTB_ADRESS, addressText, 16);
-
-			if (InetPtonW(AF_INET, addressText, &_address) != 1) {
-				MessageBox(hDlg, L"Введено неверное значение адреса", L"Ошибка", MB_OK);
-			}
-			else {
-				BOOL success;
-				int port = GetDlgItemInt(hDlg, IDTB_PORT, &success, false);
-				if (!success) {
-					MessageBox(hDlg, L"Введено неверное значение порта", L"Ошибка", MB_OK);
+		case WM_COMMAND:
+			if (LOWORD(wParam) == IDOK)
+			{
+				GetDlgItemText(hDlg, IDTB_ADRESS, addressText, 16);
+				if (InetPtonW(AF_INET, addressText, &_address) != 1) {
+					MessageBox(hDlg, L"Введено неверное значение адреса", L"Ошибка", MB_OK);
 				}
 				else {
-					_port = port;
-					EndDialog(hDlg, LOWORD(wParam));
-					return (INT_PTR)TRUE;
+					BOOL success;
+					int port = GetDlgItemInt(hDlg, IDTB_PORT, &success, false);
+					if (!success) {
+						MessageBox(hDlg, L"Введено неверное значение порта", L"Ошибка", MB_OK);
+					}
+					else {
+						_port = port;
+						EndDialog(hDlg, LOWORD(wParam));
+						return (INT_PTR)TRUE;
+					}
 				}
 			}
-		}
-		else if (LOWORD(wParam) == IDCANCEL) {
-			EndDialog(hDlg, LOWORD(wParam));
-			return (INT_PTR)TRUE;
-		}
-		break;
+			else if (LOWORD(wParam) == IDCANCEL) {
+				EndDialog(hDlg, LOWORD(wParam));
+				return (INT_PTR)TRUE;
+			}
+			break;
 	}
 	return (INT_PTR)FALSE;
 }
