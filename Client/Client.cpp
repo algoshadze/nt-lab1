@@ -7,7 +7,10 @@
 using namespace std;
 
 #define MAX_LOADSTRING 100
-
+struct ItemData
+{
+ 
+};
 // Глобальные переменные:
 HINSTANCE hInst;                                // текущий экземпляр
 WCHAR szTitle[MAX_LOADSTRING];                  // Текст строки заголовка
@@ -18,7 +21,7 @@ IN_ADDR _address = { 127, 0, 0, 1 };
 
 // Отправить объявления функций, включенных в этот модуль кода:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
-BOOL                InitInstance(HINSTANCE, int);
+BOOL                InitInstance(HINSTANCE, int); 
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    PriceChange(HWND, UINT, WPARAM, LPARAM);
