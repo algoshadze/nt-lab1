@@ -9,7 +9,15 @@ using namespace std;
 #define MAX_LOADSTRING 100
 struct ItemData
 {
- 
+	int code;
+	int price;
+	WCHAR name[100];
+	ItemData(int code, int price, const WCHAR* name)
+	{
+		this->code = code;
+		this->price = price;
+		lstrcpynW(this->name, name, 100);
+	}
 };
 // Глобальные переменные:
 HINSTANCE hInst;                                // текущий экземпляр
@@ -29,6 +37,18 @@ INT_PTR CALLBACK    Settings(HWND, UINT, WPARAM, LPARAM);
 
 WSADATA _wsaData;
 
+vector<ItemData> items;
+
+void InitData() {
+	items.clear();
+	items.push_back(ItemData(10, 100, L"Минеральная вода"));
+	items.push_back(ItemData(3, 50, L"Шоколад \"Аленка\""));
+	items.push_back(ItemData(18, 400, L"Свинина"));
+
+}
+
+
+
 int InitWinsock() {
 	int iResult;
 
@@ -47,6 +67,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_ LPWSTR    lpCmdLine,
 	_In_ int       nCmdShow)
 {
+
+
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
@@ -57,6 +79,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 	}
 
+	InitData();
 	// Инициализация глобальных строк
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
 	LoadStringW(hInstance, IDC_CLIENT, szWindowClass, MAX_LOADSTRING);
@@ -225,14 +248,19 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 	{
 		case WM_INITDIALOG:
 		{
-			//Полчаем дескриптор комбобокса
+		
+			//Получаем дескриптор комбобокса
 			HWND hItemsCombo = GetDlgItem(hDlg, IDCB_ITEMS);
-			//Добавляем строку в комбо
-			SendMessage(hItemsCombo, CB_ADDSTRING, 0, (LPARAM)L"Тут какой то товар");
-			//Добавляем еще строку в комбо
-			SendMessage(hItemsCombo, CB_ADDSTRING, 0, (LPARAM)L"Тут другой товар");
-			//Выделяем, к примеру вторую строку 
-			SendMessage(hItemsCombo, CB_SETCURSEL, (WPARAM)1, 0);
+			HWND hPriceText = GetDlgItem(hDlg, IDT_PRICE);
+			for (int i = 0; i < items.size(); i++) {
+				SendMessage(hItemsCombo, CB_ADDSTRING, 0, (LPARAM)(items[i].name));
+			}
+
+			//Выделяем первый элемент
+			SendMessage(hItemsCombo, CB_SETCURSEL, (WPARAM)0, 0);
+			SetDlgItemInt(hDlg, IDT_PRICE, items[0].price, false);
+			SetDlgItemInt(hDlg, IDTB_NEW_PRICE, items[0].price, false);
+
 		}
 		return (INT_PTR)TRUE;
 
@@ -240,6 +268,7 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		{
 			//Полчаем дескриптор комбобокса для проверки источника сообщения
 			HWND hItemsCombo = GetDlgItem(hDlg, IDCB_ITEMS);
+			HWND hPriceText = GetDlgItem(hDlg, IDT_PRICE);
 			if ((HWND)lParam == hItemsCombo) //Это сообщение от комбо
 			{
 				if (HIWORD(wParam) == CBN_SELCHANGE)  //Это сообщение об изменении выбранного товара
@@ -247,16 +276,29 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 					//Берем выбранный индекс
 					int itemIndex = (int) SendMessage(hItemsCombo, CB_GETCURSEL,
 						(WPARAM)0, (LPARAM)0);
+					SetDlgItemInt(hDlg, IDT_PRICE, items[itemIndex].price, false);
+					SetDlgItemInt(hDlg, IDTB_NEW_PRICE, items[itemIndex].price, false);
 					//Для примера выводим в сообщении
-					wstring msg(L"Выбран элемент с индексом ");
-					msg = msg.append(to_wstring(itemIndex));
-					MessageBox(hDlg, msg.c_str(), L"Информация", MB_OK);
+					//wstring msg(L"Выбран элемент с индексом ");
+					//msg = msg.append(to_wstring(itemIndex));
+					//MessageBox(hDlg, msg.c_str(), L"Информация", MB_OK);
 				}
 				return (INT_PTR)TRUE;
 			}
 			else if (LOWORD(wParam) == IDOK )
 			{
-				EndDialog(hDlg, LOWORD(wParam));
+				int itemIndex = (int)SendMessage(hItemsCombo, CB_GETCURSEL,
+					(WPARAM)0, (LPARAM)0);
+				BOOL success;
+				int new_price = GetDlgItemInt(hDlg, IDTB_NEW_PRICE, &success, false);
+				if (!success) {
+						MessageBox(hDlg, L"Введено неправильное значение цены", L"Ошибка", MB_OK);
+					}
+				else {
+					items[itemIndex].price = new_price;
+					EndDialog(hDlg, LOWORD(wParam));
+				}
+				
 				return (INT_PTR)TRUE;
 			}
 			else if (LOWORD(wParam) == IDCANCEL) {
