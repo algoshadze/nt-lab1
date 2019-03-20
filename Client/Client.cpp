@@ -286,7 +286,7 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 				return (INT_PTR)TRUE;
 			}
 			else if (LOWORD(wParam) == IDOK )
-			{
+			{ 
 				int itemIndex = (int)SendMessage(hItemsCombo, CB_GETCURSEL,
 					(WPARAM)0, (LPARAM)0);
 				BOOL success;
