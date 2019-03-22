@@ -5,6 +5,8 @@
 #include "Server.h"
 
 #define MAX_LOADSTRING 100
+#define SETTINGS_FILE_NAME "settings.txt"
+using namespace std;
 
 // Глобальные переменные:
 HINSTANCE hInst;                                // текущий экземпляр
@@ -21,6 +23,43 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Settings(HWND, UINT, WPARAM, LPARAM);
 
+
+BOOL writeSettings();
+
+BOOL readSettings() {
+	//Открываем файл настроек для чтения
+	ifstream settingsFile("settings.txt");
+	if (!settingsFile.is_open()) { //Если не существует
+		//записываем настройки по умолчанию 
+		writeSettings();
+	}
+	else {
+		//Переменные для строки, ключа и значения
+		string line, key, value;
+		while (getline(settingsFile, line)) { //Пока еще есть несчитанные строки в файле настроек- считываем
+			//Создаем потоковую переменную для считывания из строки
+			istringstream ls(line);
+			if (getline(ls, key, '=')) { //если удалось считать до "=" (включительно)
+				if (key == "port") { // если ключ = port
+					ls >> _port; //считываем значение порта
+				}
+			}
+		}
+		settingsFile.close();
+	}
+
+	return TRUE;
+}
+BOOL writeSettings() {
+	//Открываем файл настроек для записи, обнуляя содержимое файла
+	ofstream settingsFile(SETTINGS_FILE_NAME, fstream::out | fstream::trunc);
+	//Записываем ключ= и значения
+	settingsFile << "port=" << _port << endl;
+	//Закрываем файл
+	settingsFile.close();
+	return TRUE;
+}
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
 	_In_ LPWSTR    lpCmdLine,
@@ -30,6 +69,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
 	// TODO: Разместите код здесь.
+
+	readSettings();
+
 
 	// Инициализация глобальных строк
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -212,6 +254,7 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			else {
 				_port = port;
+				writeSettings();
 				EndDialog(hDlg, LOWORD(wParam));
 				return (INT_PTR)TRUE;
 			}

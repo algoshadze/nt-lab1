@@ -21,3 +21,6 @@
 // установите здесь ссылки на дополнительные заголовки, требующиеся для программы
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <string>
+#include <fstream>
+#include <sstream>
