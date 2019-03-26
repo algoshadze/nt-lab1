@@ -60,6 +60,87 @@ BOOL writeSettings() {
 	return TRUE;
 }
 
+
+struct addrinfo *_socketAddr = NULL, _hints;
+SOCKET _socket = INVALID_SOCKET;
+WSADATA _wsaData;
+
+BOOL initWinsock() {
+	int iResult;
+
+	// Initialize Winsock
+	iResult = WSAStartup(MAKEWORD(2, 2), &_wsaData);
+	if (iResult != 0) {
+		return FALSE;
+	}
+	else {
+		ZeroMemory(&_hints, sizeof(_hints));
+		_hints.ai_family = AF_INET;
+		_hints.ai_socktype = SOCK_STREAM;
+		_hints.ai_protocol = IPPROTO_TCP;
+		_hints.ai_flags = AI_PASSIVE;
+
+		// Resolve the local address and port to be used by the server
+		char portStr[16];
+		_itoa_s(_port, portStr, 16, 10);
+		int iResult = getaddrinfo(NULL, portStr, &_hints, &_socketAddr);
+		if (iResult != 0) {
+			cleanupWinsock();
+			return FALSE;
+		}
+
+		_socket = socket(_socketAddr->ai_family, _socketAddr->ai_socktype, _socketAddr->ai_protocol);
+		if (_socket == INVALID_SOCKET) {
+			cleanupWinsock();
+			return FALSE;
+		}
+
+		iResult = bind(_socket, _socketAddr->ai_addr, _socketAddr->ai_addrlen);
+		if (iResult == SOCKET_ERROR) {
+			cleanupWinsock();
+			return FALSE;
+		}
+
+		if (listen(_socket, SOMAXCONN) == SOCKET_ERROR) {
+			cleanupWinsock();
+			return FALSE;
+		}
+
+		return TRUE;
+	}
+}
+
+void cleanupWinsock() {
+	if (_socket != INVALID_SOCKET) {
+		closesocket(_socket);
+		_socket = INVALID_SOCKET;
+	}
+
+	if (_socketAddr != NULL) {
+		freeaddrinfo(_socketAddr);
+		_socketAddr = NULL;
+	}
+
+	WSACleanup();
+}
+
+BOOL startServer(HWND hWnd) {
+	if (!initWinsock()) {
+		MessageBox(hWnd, L"Не удалось запустить сервер", L"Ошибка", MB_OK | MB_ICONERROR);
+		return FALSE;
+	}
+	EnableMenuItem(GetMenu(hWnd), IDM_SETTINGS, MF_DISABLED);
+	EnableMenuItem(GetMenu(hWnd), IDM_START, MF_DISABLED);
+	EnableMenuItem(GetMenu(hWnd), IDM_STOP, MF_ENABLED);
+	return TRUE;
+}
+
+BOOL stopServer(HWND hWnd) {
+	WSACleanup();
+	EnableMenuItem(GetMenu(hWnd), IDM_START, MF_ENABLED);
+	EnableMenuItem(GetMenu(hWnd), IDM_STOP, MF_DISABLED);
+	return TRUE;
+}
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
 	_In_ LPWSTR    lpCmdLine,
@@ -171,43 +252,45 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
 	{
-	case WM_COMMAND:
-	{
-		int wmId = LOWORD(wParam);
-		// Разобрать выбор в меню:
-		switch (wmId)
+		case WM_COMMAND:
 		{
-		case IDM_ABOUT:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-			break;
-		case IDM_SETTINGS:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTINGS), hWnd, Settings);
-			break;
-		case IDM_START:
-			break;
-		case IDM_STOP:
-			break;
-		case IDM_EXIT:
-			DestroyWindow(hWnd);
+			int wmId = LOWORD(wParam);
+			// Разобрать выбор в меню:
+			switch (wmId)
+			{
+				case IDM_ABOUT:
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+					break;
+				case IDM_SETTINGS:
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTINGS), hWnd, Settings);
+					break;
+				case IDM_START:
+					startServer(hWnd);
+					break;
+				case IDM_STOP:
+					stopServer(hWnd);
+					break;
+				case IDM_EXIT:
+					DestroyWindow(hWnd);
+					break;
+				default:
+					return DefWindowProc(hWnd, message, wParam, lParam);
+			}
+		}
+		break;
+		case WM_PAINT:
+		{
+			PAINTSTRUCT ps;
+			HDC hdc = BeginPaint(hWnd, &ps);
+			// TODO: Добавьте сюда любой код прорисовки, использующий HDC...
+			EndPaint(hWnd, &ps);
+		}
+		break;
+		case WM_DESTROY:
+			PostQuitMessage(0);
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
-		}
-	}
-	break;
-	case WM_PAINT:
-	{
-		PAINTSTRUCT ps;
-		HDC hdc = BeginPaint(hWnd, &ps);
-		// TODO: Добавьте сюда любой код прорисовки, использующий HDC...
-		EndPaint(hWnd, &ps);
-	}
-	break;
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		break;
-	default:
-		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
 }
@@ -218,16 +301,16 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	UNREFERENCED_PARAMETER(lParam);
 	switch (message)
 	{
-	case WM_INITDIALOG:
-		return (INT_PTR)TRUE;
-
-	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-		{
-			EndDialog(hDlg, LOWORD(wParam));
+		case WM_INITDIALOG:
 			return (INT_PTR)TRUE;
-		}
-		break;
+
+		case WM_COMMAND:
+			if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+			{
+				EndDialog(hDlg, LOWORD(wParam));
+				return (INT_PTR)TRUE;
+			}
+			break;
 	}
 	return (INT_PTR)FALSE;
 }
@@ -239,31 +322,31 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	switch (message)
 	{
-	case WM_INITDIALOG:
-		SetDlgItemInt(hDlg, IDTB_PORT, _port, false);
-		return (INT_PTR)TRUE;
+		case WM_INITDIALOG:
+			SetDlgItemInt(hDlg, IDTB_PORT, _port, false);
+			return (INT_PTR)TRUE;
 
-	case WM_COMMAND:
-		if (LOWORD(wParam) == IDOK)
-		{
-			BOOL success;
-			int port = GetDlgItemInt(hDlg, IDTB_PORT, &success, false);
+		case WM_COMMAND:
+			if (LOWORD(wParam) == IDOK)
+			{
+				BOOL success;
+				int port = GetDlgItemInt(hDlg, IDTB_PORT, &success, false);
 
-			if (!success) {
-				MessageBox(hDlg, L"Введено неверное значение", L"Ошибка", MB_OK);
+				if (!success) {
+					MessageBox(hDlg, L"Введено неверное значение", L"Ошибка", MB_OK);
+				}
+				else {
+					_port = port;
+					writeSettings();
+					EndDialog(hDlg, LOWORD(wParam));
+					return (INT_PTR)TRUE;
+				}
 			}
-			else {
-				_port = port;
-				writeSettings();
+			else if (LOWORD(wParam) == IDCANCEL) {
 				EndDialog(hDlg, LOWORD(wParam));
 				return (INT_PTR)TRUE;
 			}
-		}
-		else if (LOWORD(wParam) == IDCANCEL) {
-			EndDialog(hDlg, LOWORD(wParam));
-			return (INT_PTR)TRUE;
-		}
-		break;
+			break;
 	}
 	return (INT_PTR)FALSE;
 }
