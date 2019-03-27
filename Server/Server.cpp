@@ -9,6 +9,8 @@
 #define WSA_ACCEPT (WM_USER + 1)
 #define WSA_EVENT (WM_USER + 2)
 
+
+
 using namespace std;
 
 // Глобальные переменные:
@@ -27,6 +29,15 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Settings(HWND, UINT, WPARAM, LPARAM);
 
+
+static wchar_t* charToWChar(const char* text)
+{
+	const size_t size = strlen(text) + 1;
+	wchar_t* wText = new wchar_t[size];
+	size_t converted;
+	mbstowcs_s(&converted, wText, size, text, size);
+	return wText;
+}
 
 BOOL writeSettings();
 
@@ -69,6 +80,20 @@ struct addrinfo *_socketAddr = NULL, _hints;
 SOCKET _socket = INVALID_SOCKET;
 WSADATA _wsaData;
 
+void cleanupWinsock() {
+	if (_socket != INVALID_SOCKET) {
+		closesocket(_socket);
+		_socket = INVALID_SOCKET;
+	}
+
+	if (_socketAddr != NULL) {
+		freeaddrinfo(_socketAddr);
+		_socketAddr = NULL;
+	}
+
+	WSACleanup();
+}
+
 BOOL initWinsock() {
 	int iResult;
 
@@ -99,7 +124,7 @@ BOOL initWinsock() {
 			return FALSE;
 		}
 
-		iResult = bind(_socket, _socketAddr->ai_addr, _socketAddr->ai_addrlen);
+		iResult = bind(_socket, _socketAddr->ai_addr, (int)_socketAddr->ai_addrlen);
 		if (iResult == SOCKET_ERROR) {
 			cleanupWinsock();
 			return FALSE;
@@ -110,21 +135,10 @@ BOOL initWinsock() {
 			return FALSE;
 		}
 	}
+	return TRUE;
 }
 
-void cleanupWinsock() {
-	if (_socket != INVALID_SOCKET) {
-		closesocket(_socket);
-		_socket = INVALID_SOCKET;
-	}
 
-	if (_socketAddr != NULL) {
-		freeaddrinfo(_socketAddr);
-		_socketAddr = NULL;
-	}
-
-	WSACleanup();
-}
 
 BOOL startServer() {
 	if (!initWinsock()) {
@@ -152,7 +166,7 @@ BOOL stopServer() {
 	return TRUE;
 }
 
-void OnWsaAccept(WORD selectError) {
+void onWsaAccept(WORD selectError) {
 	if (selectError != NULL) {
 		return;
 	}
@@ -162,16 +176,50 @@ void OnWsaAccept(WORD selectError) {
 	if (clientSocket == INVALID_SOCKET) {
 		return;
 	}
-	
+
 	int iResult = WSAAsyncSelect(clientSocket, _hAppWnd, WSA_EVENT, FD_READ | FD_CLOSE);
 	if (iResult > 0) {
 
 	}
 }
 
-void onWsaEvent(SOCKET socket, UINT event, WORD selectError) {
+void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 	if (selectError != 0) {
 		return;
+	}
+
+	switch (event) {
+		case FD_READ:
+		{
+			wstring clientCommand;
+			char buf[256];
+			int iRes;
+			do {
+				iRes = recv(socket, buf, 255, 0);
+				if (iRes > 0) {
+					buf[iRes] = 0;
+					WCHAR *text = charToWChar(buf);
+					OutputDebugString(text);
+					clientCommand.append(text);
+					delete[] text;
+				}
+				else if (iRes = 0) {
+					OutputDebugString(L"Соединение закрыто");
+				}
+				else {
+					if (clientCommand == L"GetItemList") {
+						send(socket, "Ok", 2, 0);
+					}
+				}
+			} while (iRes > 0);
+		}
+		break;
+		case FD_CLOSE:
+		{
+			OutputDebugString(L"Соединение закрыто");
+			closesocket(socket);
+		}
+		break;
 	}
 
 }
@@ -318,12 +366,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 		case WSA_ACCEPT:
 		{
-			WORD selectError = WSAGETSELECTERROR(lParam);
-			OnWsaAccept(selectError);
+			onWsaAccept(WSAGETSELECTERROR(lParam));
 		}
 		break;
 		case WSA_EVENT:
-
+		{
+			onWsaEvent((SOCKET)wParam, WSAGETSELECTEVENT(lParam), WSAGETSELECTERROR(lParam));
+		}
+		break;
 		case WM_PAINT:
 		{
 			PAINTSTRUCT ps;

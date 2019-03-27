@@ -25,11 +25,14 @@ WCHAR szTitle[MAX_LOADSTRING];                  // Текст строки за�
 WCHAR szWindowClass[MAX_LOADSTRING];            // имя класса главного окна
 int _port = 18080;
 IN_ADDR _address = { 127, 0, 0, 1 };
+struct addrinfo *_socketAddr = NULL, _hints;
+SOCKET _socket = INVALID_SOCKET;
+WSADATA _wsaData;
 
 
 // Отправить объявления функций, включенных в этот модуль кода:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
-BOOL                InitInstance(HINSTANCE, int); 
+BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    PriceChange(HWND, UINT, WPARAM, LPARAM);
@@ -74,12 +77,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 	// TODO: Разместите код здесь.
 
-	if (!InitWinsock()) {
-		MessageBox(NULL, L"Не удалось инициализировать Winsock2.", L"Ошибка", MB_OK | MB_ICONERROR);
-		return FALSE;
-	}
-
-	InitData();
 	// Инициализация глобальных строк
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
 	LoadStringW(hInstance, IDC_CLIENT, szWindowClass, MAX_LOADSTRING);
@@ -178,6 +175,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
 	{
+		case WM_CREATE:
+			if (!InitWinsock()) {
+				MessageBox(NULL, L"Не удалось инициализировать Winsock2.", L"Ошибка", MB_OK | MB_ICONERROR);
+				return FALSE;
+			}
+
+			InitData();
+			break;
 		case WM_COMMAND:
 		{
 			int wmId = LOWORD(wParam);
@@ -248,7 +253,7 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 	{
 		case WM_INITDIALOG:
 		{
-		
+
 			//Получаем дескриптор комбобокса
 			HWND hItemsCombo = GetDlgItem(hDlg, IDCB_ITEMS);
 			HWND hPriceText = GetDlgItem(hDlg, IDT_PRICE);
@@ -274,7 +279,7 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 				if (HIWORD(wParam) == CBN_SELCHANGE)  //Это сообщение об изменении выбранного товара
 				{
 					//Берем выбранный индекс
-					int itemIndex = (int) SendMessage(hItemsCombo, CB_GETCURSEL,
+					int itemIndex = (int)SendMessage(hItemsCombo, CB_GETCURSEL,
 						(WPARAM)0, (LPARAM)0);
 					SetDlgItemInt(hDlg, IDT_PRICE, items[itemIndex].price, false);
 					SetDlgItemInt(hDlg, IDTB_NEW_PRICE, items[itemIndex].price, false);
@@ -285,20 +290,20 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 				}
 				return (INT_PTR)TRUE;
 			}
-			else if (LOWORD(wParam) == IDOK )
-			{ 
+			else if (LOWORD(wParam) == IDOK)
+			{
 				int itemIndex = (int)SendMessage(hItemsCombo, CB_GETCURSEL,
 					(WPARAM)0, (LPARAM)0);
 				BOOL success;
 				int new_price = GetDlgItemInt(hDlg, IDTB_NEW_PRICE, &success, false);
 				if (!success) {
-						MessageBox(hDlg, L"Введено неправильное значение цены", L"Ошибка", MB_OK);
-					}
+					MessageBox(hDlg, L"Введено неправильное значение цены", L"Ошибка", MB_OK);
+				}
 				else {
 					items[itemIndex].price = new_price;
 					EndDialog(hDlg, LOWORD(wParam));
 				}
-				
+
 				return (INT_PTR)TRUE;
 			}
 			else if (LOWORD(wParam) == IDCANCEL) {
