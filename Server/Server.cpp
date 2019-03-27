@@ -6,12 +6,16 @@
 
 #define MAX_LOADSTRING 100
 #define SETTINGS_FILE_NAME "settings.txt"
+#define WSA_ACCEPT (WM_USER + 1)
+#define WSA_EVENT (WM_USER + 2)
+
 using namespace std;
 
 // Глобальные переменные:
 HINSTANCE hInst;                                // текущий экземпляр
 WCHAR szTitle[MAX_LOADSTRING];                  // Текст строки заголовка
 WCHAR szWindowClass[MAX_LOADSTRING];            // имя класса главного окна
+HWND _hAppWnd;
 
 int _port = 18080;
 
@@ -105,8 +109,6 @@ BOOL initWinsock() {
 			cleanupWinsock();
 			return FALSE;
 		}
-
-		return TRUE;
 	}
 }
 
@@ -124,23 +126,56 @@ void cleanupWinsock() {
 	WSACleanup();
 }
 
-BOOL startServer(HWND hWnd) {
+BOOL startServer() {
 	if (!initWinsock()) {
-		MessageBox(hWnd, L"Не удалось запустить сервер", L"Ошибка", MB_OK | MB_ICONERROR);
+		MessageBox(_hAppWnd, L"Не удалось запустить сервер", L"Ошибка", MB_OK | MB_ICONERROR);
 		return FALSE;
 	}
-	EnableMenuItem(GetMenu(hWnd), IDM_SETTINGS, MF_DISABLED);
-	EnableMenuItem(GetMenu(hWnd), IDM_START, MF_DISABLED);
-	EnableMenuItem(GetMenu(hWnd), IDM_STOP, MF_ENABLED);
+	int iResult = WSAAsyncSelect(_socket, _hAppWnd, WSA_ACCEPT, FD_ACCEPT);
+	if (iResult > 0) {
+		MessageBox(_hAppWnd, L"Ошибка WSASyncSelect", NULL, MB_OK | MB_ICONERROR);
+		return FALSE;
+	}
+	HMENU hAppMenu = GetMenu(_hAppWnd);
+	EnableMenuItem(hAppMenu, IDM_SETTINGS, MF_DISABLED);
+	EnableMenuItem(hAppMenu, IDM_START, MF_DISABLED);
+	EnableMenuItem(hAppMenu, IDM_STOP, MF_ENABLED);
 	return TRUE;
 }
 
-BOOL stopServer(HWND hWnd) {
+BOOL stopServer() {
 	WSACleanup();
-	EnableMenuItem(GetMenu(hWnd), IDM_START, MF_ENABLED);
-	EnableMenuItem(GetMenu(hWnd), IDM_STOP, MF_DISABLED);
+	HMENU hAppMenu = GetMenu(_hAppWnd);
+	EnableMenuItem(hAppMenu, IDM_SETTINGS, MF_ENABLED);
+	EnableMenuItem(hAppMenu, IDM_START, MF_ENABLED);
+	EnableMenuItem(hAppMenu, IDM_STOP, MF_DISABLED);
 	return TRUE;
 }
+
+void OnWsaAccept(WORD selectError) {
+	if (selectError != NULL) {
+		return;
+	}
+	SOCKADDR_IN addr;
+	int addrlen = sizeof(addr);
+	SOCKET clientSocket = accept(_socket, (LPSOCKADDR)&addr, &addrlen);
+	if (clientSocket == INVALID_SOCKET) {
+		return;
+	}
+	
+	int iResult = WSAAsyncSelect(clientSocket, _hAppWnd, WSA_EVENT, FD_READ | FD_CLOSE);
+	if (iResult > 0) {
+
+	}
+}
+
+void onWsaEvent(SOCKET socket, UINT event, WORD selectError) {
+	if (selectError != 0) {
+		return;
+	}
+
+}
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
 	_In_ LPWSTR    lpCmdLine,
@@ -252,6 +287,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message)
 	{
+		case WM_CREATE:
+			_hAppWnd = hWnd;
+			break;
 		case WM_COMMAND:
 		{
 			int wmId = LOWORD(wParam);
@@ -265,10 +303,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTINGS), hWnd, Settings);
 					break;
 				case IDM_START:
-					startServer(hWnd);
+					startServer();
 					break;
 				case IDM_STOP:
-					stopServer(hWnd);
+					stopServer();
 					break;
 				case IDM_EXIT:
 					DestroyWindow(hWnd);
@@ -278,6 +316,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 		}
 		break;
+		case WSA_ACCEPT:
+		{
+			WORD selectError = WSAGETSELECTERROR(lParam);
+			OnWsaAccept(selectError);
+		}
+		break;
+		case WSA_EVENT:
+
 		case WM_PAINT:
 		{
 			PAINTSTRUCT ps;
