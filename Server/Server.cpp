@@ -28,7 +28,7 @@ BOOL writeSettings();
 
 BOOL readSettings() {
 	//Открываем файл настроек для чтения
-	ifstream settingsFile("settings.txt");
+	ifstream settingsFile(SETTINGS_FILE_NAME);
 	if (!settingsFile.is_open()) { //Если не существует
 		//записываем настройки по умолчанию 
 		writeSettings();
