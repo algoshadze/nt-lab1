@@ -210,6 +210,9 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 					if (clientCommand == L"GetItemList") {
 						send(socket, "Ok", 2, 0);
 					}
+					else {
+						send(socket, "Unknown Command", 2, 0);
+					}
 				}
 			} while (iRes > 0);
 		}
