@@ -3,10 +3,12 @@
 
 #include "stdafx.h"
 #include "Client.h"
-
-using namespace std;
+#include <iostream>
 
 #define MAX_LOADSTRING 100
+#define SETTINGS_FILE_NAME "clientsettings.txt"
+using namespace std;
+
 struct ItemData
 {
 	int code;
@@ -26,6 +28,11 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // имя класса глав�
 int _port = 18080;
 IN_ADDR _address = { 127, 0, 0, 1 };
 
+struct sockaddr_in sa;
+char ip_saver[INET_ADDRSTRLEN];
+
+// store this IP address in sa:
+
 
 // Отправить объявления функций, включенных в этот модуль кода:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -38,6 +45,46 @@ INT_PTR CALLBACK    Settings(HWND, UINT, WPARAM, LPARAM);
 WSADATA _wsaData;
 
 vector<ItemData> items;
+
+BOOL writeSettings();
+
+BOOL readSettings() {
+	//Открываем файл настроек для чтения
+	ifstream settingsFile(SETTINGS_FILE_NAME);
+	if (!settingsFile.is_open()) { //Если не существует
+		//записываем настройки по умолчанию 
+		writeSettings();
+	}
+	else {
+		//Переменные для строки, ключа и значения
+		string line, key, value;
+		while (getline(settingsFile, line)) { //Пока еще есть несчитанные строки в файле настроек- считываем
+			//Создаем потоковую переменную для считывания из строки
+			istringstream ls(line);
+			if (getline(ls, key, '=')) { //если удалось считать до "=" (включительно)
+				//if (key == "address") { // если ключ = address
+					//ls >> _address; //считываем значение адреса
+				//}
+				if (key == "port") { // если ключ = port
+					ls >> _port; //считываем значение порта
+				}
+			}
+		}
+		settingsFile.close();
+	}
+
+	return TRUE;
+}
+BOOL writeSettings() {
+	//Открываем файл настроек для записи, обнуляя содержимое файла
+	ofstream settingsFile(SETTINGS_FILE_NAME, fstream::out | fstream::trunc);
+	//Записываем ключ= и значения
+	//settingsFile << "address" << _address << endl;
+	settingsFile << "port=" << _port << endl;
+	//Закрываем файл
+	settingsFile.close();
+	return TRUE;
+}
 
 void InitData() {
 	items.clear();
@@ -74,6 +121,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 	// TODO: Разместите код здесь.
 
+	readSettings();
 	if (!InitWinsock()) {
 		MessageBox(NULL, L"Не удалось инициализировать Winsock2.", L"Ошибка", MB_OK | MB_ICONERROR);
 		return FALSE;
@@ -339,6 +387,7 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					}
 					else {
 						_port = port;
+						writeSettings();
 						EndDialog(hDlg, LOWORD(wParam));
 						return (INT_PTR)TRUE;
 					}
