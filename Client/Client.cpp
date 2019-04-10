@@ -62,10 +62,11 @@ BOOL readSettings() {
 			//Создаем потоковую переменную для считывания из строки
 			istringstream ls(line);
 			if (getline(ls, key, '=')) { //если удалось считать до "=" (включительно)
-				//if (key == "address") { // если ключ = address
-					//ls >> _address; //считываем значение адреса
-				//}
-				if (key == "port") { // если ключ = port
+				if (key == "address") { // если ключ = address
+					ls >> value; //считываем значение адреса
+					InetPtonA(AF_INET, value.c_str(), &_address);
+				}
+				else if (key == "port") { // если ключ = port
 					ls >> _port; //считываем значение порта
 				}
 			}
@@ -79,7 +80,9 @@ BOOL writeSettings() {
 	//Открываем файл настроек для записи, обнуляя содержимое файла
 	ofstream settingsFile(SETTINGS_FILE_NAME, fstream::out | fstream::trunc);
 	//Записываем ключ= и значения
-	//settingsFile << "address" << _address << endl;
+	CHAR addressText[16];
+	InetNtopA(AF_INET, &_address, addressText, 16);
+	settingsFile << "address=" << addressText << endl;
 	settingsFile << "port=" << _port << endl;
 	//Закрываем файл
 	settingsFile.close();
