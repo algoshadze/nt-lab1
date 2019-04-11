@@ -23,3 +23,5 @@
 #include <ws2tcpip.h>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <sstream>
