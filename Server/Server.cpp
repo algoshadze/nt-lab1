@@ -13,6 +13,29 @@
 
 using namespace std;
 
+struct ItemData
+{
+	int code;
+	int price;
+	WCHAR name[100];
+	ItemData(int code, int price, const WCHAR* name)
+	{
+		this->code = code;
+		this->price = price;
+		lstrcpynW(this->name, name, 100);
+	}
+};
+
+vector<ItemData> items;
+
+void readData() {
+	items.clear();
+	items.push_back(ItemData(10, 100, L"Минеральная вода"));
+	items.push_back(ItemData(3, 50, L"Шоколад \"Аленка\""));
+	items.push_back(ItemData(18, 400, L"Свинина"));
+
+}
+
 // Глобальные переменные:
 HINSTANCE hInst;                                // текущий экземпляр
 WCHAR szTitle[MAX_LOADSTRING];                  // Текст строки заголовка
@@ -28,6 +51,7 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Settings(HWND, UINT, WPARAM, LPARAM);
+void sendResponse(SOCKET socket, wstring& message);
 
 
 static wchar_t* charToWChar(const char* text)
@@ -191,7 +215,7 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 	switch (event) {
 		case FD_READ:
 		{
-			wstring clientCommand;
+			wstring message;
 			char buf[256];
 			int iRes;
 			do {
@@ -200,19 +224,40 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 					buf[iRes] = 0;
 					WCHAR *text = charToWChar(buf);
 					OutputDebugString(text);
-					clientCommand.append(text);
+					message.append(text);
 					delete[] text;
 				}
 				else if (iRes = 0) {
 					OutputDebugString(L"Соединение закрыто");
 				}
 				else {
-					if (clientCommand == L"GetItemList") {
-						send(socket, "Ok", 2, 0);
+					wstringstream ms(message);
+					wstring command;
+					wstringstream responseStream;
+					wstring response;
+					
+					if (message.size() > 1 && getline(ms, command, L'|')) {
+						if (command == L"1") {
+							response.append(L"1|");
+							responseStream << L"1|";
+							for (int i = 0; i < items.size(); i++) {
+								responseStream << items[i].code << L"|" << items[i].name << L"|" << items[i].price << L"|";
+							}
+							response = responseStream.str();
+							sendResponse(socket, response);
+						}
+						else if (command == L"2") {
+						}
+						else {
+							response.append(L"Ошибка: 0|неизвестный код команды");
+							sendResponse(socket, response);
+						}
 					}
 					else {
-						send(socket, "Unknown Command", 2, 0);
+						response.append(L"0|Ошибка протокола - неверный формат команды");
+						sendResponse(socket, response);
 					}
+
 				}
 			} while (iRes > 0);
 		}
@@ -225,6 +270,16 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 		break;
 	}
 
+}
+
+void sendResponse(SOCKET socket, wstring& message) {
+	wstring_convert<codecvt_utf8<wchar_t>> conv;
+	string u8str = conv.to_bytes(message);
+	//int size = (int)message.size()*sizeof(WCHAR);
+	int size = (int)u8str.size();
+	//const char* data = (const char*)message.c_str();
+	const char* data = u8str.c_str();
+	send(socket, data, size, 0);
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -340,6 +395,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		case WM_CREATE:
 			_hAppWnd = hWnd;
+			readData();
 			break;
 		case WM_COMMAND:
 		{
