@@ -51,7 +51,7 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Settings(HWND, UINT, WPARAM, LPARAM);
-void sendResponse(SOCKET socket, wstring& message);
+void sendResponse(SOCKET socket, wstring message);
 
 
 static wchar_t* charToWChar(const char* text)
@@ -234,28 +234,49 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 					wstringstream ms(message);
 					wstring command;
 					wstringstream responseStream;
-					wstring response;
-					
+
 					if (message.size() > 1 && getline(ms, command, L'|')) {
 						if (command == L"1") {
-							response.append(L"1|");
 							responseStream << L"1|";
 							for (int i = 0; i < items.size(); i++) {
 								responseStream << items[i].code << L"|" << items[i].name << L"|" << items[i].price << L"|";
 							}
-							response = responseStream.str();
-							sendResponse(socket, response);
+							sendResponse(socket, responseStream.str());
+							return;
 						}
 						else if (command == L"2") {
+							wstring codeStr, priceStr;
+							int code, price;
+
+							if (!getline(ms, codeStr, L'|') || !getline(ms, priceStr, L'|')) {
+								responseStream << L"0|Ошибка в формате команды изменения цены: неверное количество аргументов.";
+								sendResponse(socket, responseStream.str());
+								return;
+							}
+							try {
+								code = stoi(codeStr);
+								price = stoi(priceStr);
+							}
+							catch (const std::invalid_argument& ia) {
+								responseStream << L"0|Ошибка в формате команды изменения цены: неверный тип аргументов.";
+								sendResponse(socket, responseStream.str());
+								return;
+							}
+							for (int i = 0; i < items.size(); i++) {
+								if (items[i].code == code) {
+									items[i].price = price;
+									sendResponse(socket, L"2|");
+									return;
+								}
+							}
+							sendResponse(socket, L"0|Ошибка изменения цены: не найден код товара.");
 						}
 						else {
-							response.append(L"Ошибка: 0|неизвестный код команды");
-							sendResponse(socket, response);
+							sendResponse(socket, L"Ошибка: 0|Неизвестный код команды");
 						}
 					}
 					else {
-						response.append(L"0|Ошибка протокола - неверный формат команды");
-						sendResponse(socket, response);
+						sendResponse(socket, L"0|Ошибка протокола - неверный формат команды");
 					}
 
 				}
@@ -272,7 +293,8 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 
 }
 
-void sendResponse(SOCKET socket, wstring& message) {
+void sendResponse(SOCKET socket, wstring message) {
+	message.append(L"\r\n");
 	wstring_convert<codecvt_utf8<wchar_t>> conv;
 	string u8str = conv.to_bytes(message);
 	//int size = (int)message.size()*sizeof(WCHAR);

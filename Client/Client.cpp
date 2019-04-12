@@ -38,8 +38,6 @@ INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    PriceChange(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Settings(HWND, UINT, WPARAM, LPARAM);
 
-WSADATA _wsaData;
-
 vector<ItemData> items;
 
 void InitData() {
