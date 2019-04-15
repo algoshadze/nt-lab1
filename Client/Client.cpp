@@ -63,7 +63,7 @@ int InitWinsock() {
 	}
 }
 
-void onConnect() {
+BOOL onConnect() {
 	int iResult;
 	struct addrinfo *result = NULL,
 		*ptr = NULL,
@@ -76,9 +76,11 @@ void onConnect() {
 
 	iResult = getaddrinfo("localhost", "9432", &hints, &result);
 	if (iResult != 0) {
-		printf("getaddrinfo failed with error: %d\n", iResult);
+		wstring err(L"getaddrinfo failed with error: ");
+		err.append(to_wstring(iResult));
+		OutputDebugString(err.c_str());
 		WSACleanup();
-		return ;
+		return FALSE;
 	}
 
 	for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
@@ -87,9 +89,10 @@ void onConnect() {
 		_socket = socket(ptr->ai_family, ptr->ai_socktype,
 			ptr->ai_protocol);
 		if (_socket == INVALID_SOCKET) {
-			printf("socket failed with error: %ld\n", WSAGetLastError());
-			WSACleanup();
-			return;
+			wstring err(L"socket failed with error: ");
+			err.append(to_wstring(WSAGetLastError()));
+			OutputDebugString(err.c_str());
+			continue;
 		}
 
 		// Connect to server.
@@ -105,11 +108,104 @@ void onConnect() {
 	freeaddrinfo(result);
 
 	if (_socket == INVALID_SOCKET) {
-		printf("Unable to connect to server!\n");
 		WSACleanup();
-		return;
+		return FALSE;
 	}
 
+	ULONG iMode;
+	iResult = ioctlsocket(_socket, FIONBIO, &iMode);
+
+	return TRUE;
+}
+
+void onDisconnect() {
+	closesocket(_socket);
+}
+
+void sendRquest(wstring message) {
+	int size = (int)message.size() * sizeof(WCHAR);
+	const char* data = (const char*)message.c_str();
+	send(_socket, data, size, 0);
+}
+
+BOOL receiveResponse(wstring &responceCode, vector<wstring> &responseFields) {
+
+	responseFields.clear();
+
+	wstringstream responseStream;
+	char buf[256];
+	int iRes;
+
+	do {
+		iRes = recv(_socket, buf, 254, 0);
+		if (iRes > 0) {
+			buf[iRes] = 0;
+			buf[iRes+1] = 0;
+			responseStream << (WCHAR*)buf;
+		}
+		else if (iRes == 0) {
+			responseFields.push_back(L"Соединение закрыто сервером.");
+			return FALSE;
+		}
+		else {
+			responseStream.seekg(0, responseStream.beg);
+
+			if (!getline(responseStream, responceCode, L'|')) {
+				responseFields.push_back(L"Ошибка протокола: не удалось считать код ответа");
+				return FALSE;
+			}
+
+			wstring field;
+			while (getline(responseStream, field, L'|')) {
+				responseFields.push_back(field);
+			}
+			return TRUE;
+		}
+	} while (iRes > 0);
+}
+
+BOOL onGetItemsList() {
+	wstring msg(L"1|");
+	sendRquest(msg);
+
+	wstring responseCode;
+	vector<wstring> responseFields;
+ 	if (!receiveResponse(responseCode, responseFields) || responseCode == L"0") {
+		MessageBox(NULL, responseFields[0].c_str(), L"Ошибка получения данных от сервера", MB_ICONERROR | MB_OK);
+		return FALSE;
+	}
+
+	if (responseCode != L"1") {
+		MessageBox(NULL, L"Неверный код ответа - ожидалось значение '1'", L"Ошибка получения данных от сервера", MB_ICONERROR | MB_OK);
+		return FALSE;
+	}
+
+	if (responseFields.size() % 3 != 0)
+	{
+		MessageBox(NULL, L"Неверное количество полей в списке товаров. Ожидалось кратное 3.", L"Ошибка операции", MB_ICONERROR | MB_OK);
+		return FALSE;
+	}
+
+	items.clear();
+	for (int i = 0; i < responseFields.size(); i += 3) {
+		int code, price;
+		wstring name;
+		int itemIndex = i / 3;
+		try {
+			ItemData itemData(stoi(responseFields[i]), stoi(responseFields[i + 2]), responseFields[i + 1].c_str());
+			items.push_back(itemData);
+		}
+		catch (const std::invalid_argument& ia) {
+			MessageBox(NULL, L"Неверный формат кода или цены. Ожидалось число.", L"Ошибка операции", MB_ICONERROR | MB_OK);
+			return FALSE;
+		}
+		catch (...) {
+			MessageBox(NULL, L"Неизвестная ошибка.", L"Ошибка операции", MB_ICONERROR | MB_OK);
+			return FALSE;
+		}
+	}
+
+	return TRUE;
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -246,8 +342,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					onConnect();
 				}
 				break;
-				case IDM_REQUEST:
-					break;
+				case IDM_GET_ITEM_LIST:
+				{
+					onGetItemsList();
+				}
+				break;
 				case IDM_PRICECHANGE:
 					DialogBox(hInst, MAKEINTRESOURCE(IDD_PRICE_CHANGE), hWnd, PriceChange);
 					break;

@@ -219,15 +219,17 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 			char buf[256];
 			int iRes;
 			do {
-				iRes = recv(socket, buf, 255, 0);
+				iRes = recv(socket, buf, 254, 0);
 				if (iRes > 0) {
 					buf[iRes] = 0;
-					WCHAR *text = charToWChar(buf);
+					buf[iRes+1] = 0;
+					//WCHAR *text = charToWChar(buf);
+					WCHAR *text = (WCHAR*)buf;
 					OutputDebugString(text);
 					message.append(text);
-					delete[] text;
+					//delete[] text;
 				}
-				else if (iRes = 0) {
+				else if (iRes == 0) {
 					OutputDebugString(L"Соединение закрыто");
 				}
 				else {
@@ -293,7 +295,8 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 
 }
 
-void sendResponse(SOCKET socket, wstring message) {
+
+void sendResponseUTF8(SOCKET socket, wstring message) {
 	message.append(L"\r\n");
 	wstring_convert<codecvt_utf8<wchar_t>> conv;
 	string u8str = conv.to_bytes(message);
@@ -303,6 +306,22 @@ void sendResponse(SOCKET socket, wstring message) {
 	const char* data = u8str.c_str();
 	send(socket, data, size, 0);
 }
+
+void sendResponseUTF16(SOCKET socket, wstring message) {
+	int size = (int)message.size()*sizeof(WCHAR);
+	const char* data = (const char*)message.c_str();
+	send(socket, data, size, 0);
+}
+
+
+
+void sendResponse(SOCKET socket, wstring message) {
+	sendResponseUTF16(socket, message);
+}
+
+
+
+
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
