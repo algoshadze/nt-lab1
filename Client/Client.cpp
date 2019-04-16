@@ -208,6 +208,15 @@ BOOL onGetItemsList() {
 	return TRUE;
 }
 
+void displayItems(const WCHAR* message) {
+	wstringstream itemsTextStream;
+	for (int i = 0; i < items.size(); i++) {
+		itemsTextStream << items[i].name << L" " << items[i].price << L'\n';
+	}
+
+	MessageBox(NULL, itemsTextStream.str().c_str(), message, MB_ICONINFORMATION || MB_OK);
+}
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
 	_In_ LPWSTR    lpCmdLine,
@@ -344,7 +353,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				break;
 				case IDM_GET_ITEM_LIST:
 				{
-					onGetItemsList();
+					if (onGetItemsList()) {
+						displayItems(L"Получен список товаров от сервера.");
+					}
 				}
 				break;
 				case IDM_PRICECHANGE:

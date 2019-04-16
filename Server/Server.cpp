@@ -260,7 +260,7 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 								price = stoi(priceStr);
 							}
 							catch (const std::invalid_argument& ia) {
-								responseStream << L"0|Ошибка в формате команды изменения цены: неверный тип аргументов.";
+								responseStream << L"0|Ошибка в формате команды изменения цены: неверный тип аргументов. " << ia.what();
 								sendResponse(socket, responseStream.str());
 								return;
 							}
