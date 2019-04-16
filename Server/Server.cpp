@@ -233,6 +233,8 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 					OutputDebugString(L"Соединение закрыто");
 				}
 				else {
+					OutputDebugString(L"Получен запрос.");
+					OutputDebugString(message.c_str());
 					wstringstream ms(message);
 					wstring command;
 					wstringstream responseStream;
@@ -316,6 +318,8 @@ void sendResponseUTF16(SOCKET socket, wstring message) {
 
 
 void sendResponse(SOCKET socket, wstring message) {
+	OutputDebugString(L"Отправляем ответ");
+	OutputDebugString(message.c_str());
 	sendResponseUTF16(socket, message);
 }
 
