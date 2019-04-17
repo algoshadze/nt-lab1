@@ -7,6 +7,8 @@
 using namespace std;
 
 #define MAX_LOADSTRING 100
+#define SETTINGS_FILE_NAME "clientsettings.txt"
+
 struct ItemData
 {
 	int code;
@@ -23,8 +25,8 @@ struct ItemData
 HINSTANCE hInst;                                // текущий экземпляр
 WCHAR szTitle[MAX_LOADSTRING];                  // Текст строки заголовка
 WCHAR szWindowClass[MAX_LOADSTRING];            // имя класса главного окна
-int _port = 18080;
-IN_ADDR _address = { 127, 0, 0, 1 };
+int _port = 9432;
+string _address("localhost");
 struct addrinfo *_socketAddr = NULL, _hints;
 SOCKET _socket = INVALID_SOCKET;
 WSADATA _wsaData;
@@ -40,11 +42,45 @@ INT_PTR CALLBACK    Settings(HWND, UINT, WPARAM, LPARAM);
 
 vector<ItemData> items;
 
-void InitData() {
-	items.clear();
-	items.push_back(ItemData(10, 100, L"Минеральная вода"));
-	items.push_back(ItemData(3, 50, L"Шоколад \"Аленка\""));
-	items.push_back(ItemData(18, 400, L"Свинина"));
+BOOL writeSettings();
+
+BOOL readSettings() {
+	//Открываем файл настроек для чтения
+	ifstream settingsFile(SETTINGS_FILE_NAME);
+	if (!settingsFile.is_open()) { //Если не существует
+		//записываем настройки по умолчанию 
+		writeSettings();
+	}
+	else {
+		//Переменные для строки, ключа и значения
+		string line, key, value;
+		while (getline(settingsFile, line)) { //Пока еще есть несчитанные строки в файле настроек- считываем
+			//Создаем потоковую переменную для считывания из строки
+			istringstream ls(line);
+			if (getline(ls, key, '=')) { //если удалось считать до "=" (включительно)
+				if (key == "address") { // если ключ = address
+					ls >> _address; //считываем значение адреса
+				}
+				else if (key == "port") { // если ключ = port
+					ls >> _port; //считываем значение порта
+				}
+			}
+		}
+		settingsFile.close();
+	}
+
+	return TRUE;
+}
+
+BOOL writeSettings() {
+	//Открываем файл настроек для записи, обнуляя содержимое файла
+	ofstream settingsFile(SETTINGS_FILE_NAME, fstream::out | fstream::trunc);
+	//Записываем ключ,=,значения
+	settingsFile << "address" << _address << endl;
+	settingsFile << "port=" << _port << endl;
+	//Закрываем файл
+	settingsFile.close();
+	return TRUE;
 }
 
 
@@ -73,7 +109,10 @@ BOOL onConnect() {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
 
-	iResult = getaddrinfo("localhost", "9432", &hints, &result);
+	char portStr[16];
+	_itoa_s<16>(_port, portStr, 10);
+
+	iResult = getaddrinfo(_address.c_str(), portStr, &hints, &result);
 	if (iResult != 0) {
 		wstring err(L"getaddrinfo failed with error: ");
 		err.append(to_wstring(iResult));
@@ -83,7 +122,6 @@ BOOL onConnect() {
 	}
 
 	for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
-
 		// Create a SOCKET for connecting to server
 		_socket = socket(ptr->ai_family, ptr->ai_socktype,
 			ptr->ai_protocol);
@@ -360,8 +398,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				MessageBox(NULL, L"Не удалось инициализировать Winsock2.", L"Ошибка", MB_OK | MB_ICONERROR);
 				return FALSE;
 			}
-
-			InitData();
 			break;
 		case WM_COMMAND:
 		{
@@ -524,24 +560,27 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
-	WCHAR addressText[16];
 
 	switch (message)
 	{
 		case WM_INITDIALOG:
 			SetDlgItemInt(hDlg, IDTB_PORT, _port, false);
-			InetNtopW(AF_INET, &_address, addressText, 16);
-			SetDlgItemText(hDlg, IDTB_ADRESS, addressText);
+			SetDlgItemTextA(hDlg, IDTB_ADRESS, (const char*)_address.c_str());
 			return (INT_PTR)TRUE;
 
 		case WM_COMMAND:
 			if (LOWORD(wParam) == IDOK)
 			{
-				GetDlgItemText(hDlg, IDTB_ADRESS, addressText, 16);
-				if (InetPtonW(AF_INET, addressText, &_address) != 1) {
+				CHAR addressText[1024];
+				GetDlgItemTextA(hDlg, IDTB_ADRESS, addressText, 1024);
+					BOOL addressOk = TRUE;
+				//TODO: Add actual address validity check
+				if (!addressOk) {
 					MessageBox(hDlg, L"Введено неверное значение адреса", L"Ошибка", MB_OK);
 				}
 				else {
+					_address.clear();
+					_address.append(addressText);
 					BOOL success;
 					int port = GetDlgItemInt(hDlg, IDTB_PORT, &success, false);
 					if (!success) {
@@ -549,6 +588,7 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					}
 					else {
 						_port = port;
+						writeSettings();
 						EndDialog(hDlg, LOWORD(wParam));
 						return (INT_PTR)TRUE;
 					}

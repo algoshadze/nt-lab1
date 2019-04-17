@@ -1,2 +1,2 @@
-address=127.6.0.3
-port=18080
+address127.0.0.1
+port=9432
