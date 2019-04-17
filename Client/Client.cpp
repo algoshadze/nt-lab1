@@ -112,9 +112,6 @@ BOOL onConnect() {
 		return FALSE;
 	}
 
-	ULONG iMode;
-	iResult = ioctlsocket(_socket, FIONBIO, &iMode);
-
 	return TRUE;
 }
 
@@ -128,75 +125,89 @@ void sendRquest(wstring message) {
 	send(_socket, data, size, 0);
 }
 
-BOOL receiveResponse(wstring &responceCode, vector<wstring> &responseFields) {
+int receiveResponse(vector<wstring> &responseFields) {
 
 	responseFields.clear();
 
 	wstringstream responseStream;
 	char buf[256];
 	int iRes;
+	BOOL hasMoreData = FALSE;
 
 	do {
 		iRes = recv(_socket, buf, 254, 0);
 		if (iRes > 0) {
-			buf[iRes] = 0;
-			buf[iRes+1] = 0;
+			if (buf[iRes - 2] == '\n' && buf[iRes-1] == 0) {
+				buf[iRes - 2] = 0;
+				hasMoreData = FALSE;
+			}
+			else {
+				buf[iRes] = 0;
+				buf[iRes + 1] = 0;
+				hasMoreData = TRUE;
+			}
 			responseStream << (WCHAR*)buf;
 		}
 		else if (iRes == 0) {
 			responseFields.push_back(L"Соединение закрыто сервером.");
-			return FALSE;
+			return 0;
 		}
-		else {
-			responseStream.seekg(0, responseStream.beg);
+	} while (hasMoreData);
 
-			if (!getline(responseStream, responceCode, L'|')) {
-				responseFields.push_back(L"Ошибка протокола: не удалось считать код ответа");
-				return FALSE;
-			}
+	responseStream.seekg(0, responseStream.beg);
+	wstring responseCodeStr;
+	int responseCode;
+	if (!getline(responseStream, responseCodeStr, L'|')) {
+		responseFields.push_back(L"Ошибка протокола: не удалось считать код ответа");
+		return 0;
+	}
+	try {
+		responseCode = stoi(responseCodeStr);
+	}
+	catch (const std::invalid_argument&) {
+		responseFields.push_back(L"Ошибка протокола: неверный формат кода команды. Ожидалось число.");
+		return 0;
+	}
 
-			wstring field;
-			while (getline(responseStream, field, L'|')) {
-				responseFields.push_back(field);
-			}
-			return TRUE;
-		}
-	} while (iRes > 0);
+	wstring field;
+	while (getline(responseStream, field, L'|')) {
+		responseFields.push_back(field);
+	}
+	return responseCode;
 }
 
 BOOL onGetItemsList() {
 	wstring msg(L"1|");
 	sendRquest(msg);
 
-	wstring responseCode;
+	int responseCode;
 	vector<wstring> responseFields;
- 	if (!receiveResponse(responseCode, responseFields) || responseCode == L"0") {
-		MessageBox(NULL, responseFields[0].c_str(), L"Ошибка получения данных от сервера", MB_ICONERROR | MB_OK);
+	if ((responseCode = receiveResponse(responseFields)) == 0) {
+		MessageBox(NULL, responseFields[0].c_str(), L"Ошибка операции", MB_ICONERROR | MB_OK);
 		return FALSE;
 	}
 
-	if (responseCode != L"1") {
-		MessageBox(NULL, L"Неверный код ответа - ожидалось значение '1'", L"Ошибка получения данных от сервера", MB_ICONERROR | MB_OK);
+	if (responseCode != 1) {
+		MessageBox(NULL, L"Неверный код ответа - ожидалось значение '1'", L"Ошибка протокола", MB_ICONERROR | MB_OK);
 		return FALSE;
 	}
 
 	if (responseFields.size() % 3 != 0)
 	{
-		MessageBox(NULL, L"Неверное количество полей в списке товаров. Ожидалось кратное 3.", L"Ошибка операции", MB_ICONERROR | MB_OK);
+		MessageBox(NULL, L"Неверное количество полей в списке товаров. Ожидалось кратное 3.", L"Ошибка протокола", MB_ICONERROR | MB_OK);
 		return FALSE;
 	}
 
 	items.clear();
 	for (int i = 0; i < responseFields.size(); i += 3) {
-		int code, price;
 		wstring name;
 		int itemIndex = i / 3;
 		try {
 			ItemData itemData(stoi(responseFields[i]), stoi(responseFields[i + 2]), responseFields[i + 1].c_str());
 			items.push_back(itemData);
 		}
-		catch (const std::invalid_argument& ia) {
-			MessageBox(NULL, L"Неверный формат кода или цены. Ожидалось число.", L"Ошибка операции", MB_ICONERROR | MB_OK);
+		catch (const std::invalid_argument&) {
+			MessageBox(NULL, L"Неверный формат кода или цены. Ожидалось число.", L"Ошибка протокола", MB_ICONERROR | MB_OK);
 			return FALSE;
 		}
 		catch (...) {
@@ -208,12 +219,31 @@ BOOL onGetItemsList() {
 	return TRUE;
 }
 
+BOOL setNewPrice(int code, int price) {
+	wstringstream requestStream;
+	requestStream << L"2|" << code << L"|" << price << L"|";
+	sendRquest(requestStream.str());
+	vector<wstring> responseFields;
+	int responseCode;
+	if ((responseCode = receiveResponse(responseFields)) == 0) {
+		MessageBox(NULL, responseFields[0].c_str(), L"Ошибка протокола", MB_ICONERROR | MB_OK);
+		return FALSE;
+	}
+
+	if (responseCode != 2) {
+		MessageBox(NULL, L"Неверный код ответа - ожидалось значение '2'", L"Ошибка протокола", MB_ICONERROR | MB_OK);
+		return FALSE;
+	}
+
+	return TRUE;
+
+}
+
 void displayItems(const WCHAR* message) {
 	wstringstream itemsTextStream;
 	for (int i = 0; i < items.size(); i++) {
 		itemsTextStream << items[i].name << L" " << items[i].price << L'\n';
 	}
-
 	MessageBox(NULL, itemsTextStream.str().c_str(), message, MB_ICONINFORMATION || MB_OK);
 }
 
@@ -351,6 +381,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					onConnect();
 				}
 				break;
+				case IDM_DISCONNECT:
+				{
+					onDisconnect();
+				}
+				break;
 				case IDM_GET_ITEM_LIST:
 				{
 					if (onGetItemsList()) {
@@ -415,6 +450,10 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		case WM_INITDIALOG:
 		{
 
+			if (!onGetItemsList()) {
+				MessageBox(hDlg, L"Не удалось обновить список товаров", L"Ошибка", MB_OK | MB_ICONERROR);
+				EndDialog(hDlg, -1);
+			}
 			//Получаем дескриптор комбобокса
 			HWND hItemsCombo = GetDlgItem(hDlg, IDCB_ITEMS);
 			HWND hPriceText = GetDlgItem(hDlg, IDT_PRICE);
@@ -461,7 +500,13 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 					MessageBox(hDlg, L"Введено неправильное значение цены", L"Ошибка", MB_OK);
 				}
 				else {
-					items[itemIndex].price = new_price;
+					//items[itemIndex].price = new_price;
+					if (setNewPrice(items[itemIndex].code, new_price )){
+						MessageBox(hDlg, L"Новая цена успешно установлена", L"Успех", MB_OK);
+						}
+					else {
+						MessageBox(hDlg, L"Новая цена успешно установлена", L"Ошибка операции", MB_OK | MB_ICONERROR);
+					}
 					EndDialog(hDlg, LOWORD(wParam));
 				}
 

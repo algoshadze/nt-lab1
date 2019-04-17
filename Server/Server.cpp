@@ -205,6 +205,8 @@ void onWsaAccept(WORD selectError) {
 	if (iResult > 0) {
 
 	}
+
+	OutputDebugString(L"Клиент подключен\r\n");
 }
 
 void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
@@ -225,16 +227,16 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 					buf[iRes+1] = 0;
 					//WCHAR *text = charToWChar(buf);
 					WCHAR *text = (WCHAR*)buf;
-					OutputDebugString(text);
 					message.append(text);
 					//delete[] text;
 				}
 				else if (iRes == 0) {
-					OutputDebugString(L"Соединение закрыто");
+					OutputDebugString(L"Соединение закрыто\r\n");
 				}
 				else {
-					OutputDebugString(L"Получен запрос.");
+					OutputDebugString(L"Получен запрос\r\n");
 					OutputDebugString(message.c_str());
+					OutputDebugString(L"\r\n");
 					wstringstream ms(message);
 					wstring command;
 					wstringstream responseStream;
@@ -289,7 +291,7 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 		break;
 		case FD_CLOSE:
 		{
-			OutputDebugString(L"Соединение закрыто");
+			OutputDebugString(L"Соединение закрыто\r\n");
 			closesocket(socket);
 		}
 		break;
@@ -310,6 +312,7 @@ void sendResponseUTF8(SOCKET socket, wstring message) {
 }
 
 void sendResponseUTF16(SOCKET socket, wstring message) {
+	message.append(L"\n");
 	int size = (int)message.size()*sizeof(WCHAR);
 	const char* data = (const char*)message.c_str();
 	send(socket, data, size, 0);
@@ -318,8 +321,9 @@ void sendResponseUTF16(SOCKET socket, wstring message) {
 
 
 void sendResponse(SOCKET socket, wstring message) {
-	OutputDebugString(L"Отправляем ответ");
+	OutputDebugString(L"Отправляем ответ\r\n");
 	OutputDebugString(message.c_str());
+	OutputDebugString(L"\r\n");
 	sendResponseUTF16(socket, message);
 }
 
