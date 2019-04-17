@@ -45,7 +45,6 @@ void InitData() {
 	items.push_back(ItemData(10, 100, L"Минеральная вода"));
 	items.push_back(ItemData(3, 50, L"Шоколад \"Аленка\""));
 	items.push_back(ItemData(18, 400, L"Свинина"));
-
 }
 
 
