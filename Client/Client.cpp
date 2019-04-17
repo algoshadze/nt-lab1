@@ -76,7 +76,7 @@ BOOL writeSettings() {
 	//Открываем файл настроек для записи, обнуляя содержимое файла
 	ofstream settingsFile(SETTINGS_FILE_NAME, fstream::out | fstream::trunc);
 	//Записываем ключ,=,значения
-	settingsFile << "address" << _address << endl;
+	settingsFile << "address=" << _address << endl;
 	settingsFile << "port=" << _port << endl;
 	//Закрываем файл
 	settingsFile.close();
@@ -114,10 +114,9 @@ BOOL onConnect() {
 
 	iResult = getaddrinfo(_address.c_str(), portStr, &hints, &result);
 	if (iResult != 0) {
-		wstring err(L"getaddrinfo failed with error: ");
+		wstring err(L"Не удалось получить информацию об адресе сервера: ");
 		err.append(to_wstring(iResult));
-		OutputDebugString(err.c_str());
-		WSACleanup();
+		MessageBox(NULL, err.c_str(), L"Ошибка подключения", MB_OK | MB_ICONERROR);
 		return FALSE;
 	}
 
@@ -145,7 +144,7 @@ BOOL onConnect() {
 	freeaddrinfo(result);
 
 	if (_socket == INVALID_SOCKET) {
-		WSACleanup();
+		MessageBox(NULL, L"Не удалось подключиться к серверу", L"Ошибка подключения", MB_OK | MB_ICONERROR);
 		return FALSE;
 	}
 
@@ -398,6 +397,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				MessageBox(NULL, L"Не удалось инициализировать Winsock2.", L"Ошибка", MB_OK | MB_ICONERROR);
 				return FALSE;
 			}
+			readSettings();
 			break;
 		case WM_COMMAND:
 		{
