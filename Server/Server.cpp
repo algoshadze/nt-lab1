@@ -6,6 +6,7 @@
 
 #define MAX_LOADSTRING 100
 #define SETTINGS_FILE_NAME "settings.txt"
+#define DATA_FILE_NAME "data.txt"
 #define WSA_ACCEPT (WM_USER + 1)
 #define WSA_EVENT (WM_USER + 2)
 
@@ -28,13 +29,48 @@ struct ItemData
 
 vector<ItemData> items;
 
+string toUTF8(const WCHAR* widestring) {
+	wstring_convert<codecvt_utf8<wchar_t>> conv;
+	string u8str = conv.to_bytes(widestring);
+	return u8str;
+}
+
+wstring fromUTF8(const char* source) {
+	wstring_convert<codecvt_utf8<wchar_t>> conv;
+	wstring str = conv.from_bytes(source);
+	return str;
+}
+
+void writeData() {
+	ofstream dataFile(DATA_FILE_NAME, fstream::out | fstream::trunc);
+	for (int i = 0; i < items.size(); i++) {
+		dataFile << items[i].code << "|" << toUTF8(items[i].name) << "|" << items[i].price << "|" << endl;
+	}
+
+	dataFile.close();
+}
+ 
 void readData() {
 	items.clear();
-	items.push_back(ItemData(10, 100, L"Минеральная вода"));
-	items.push_back(ItemData(3, 50, L"Шоколад \"Аленка\""));
-	items.push_back(ItemData(18, 400, L"Свинина"));
+	//items.push_back(ItemData(10, 100, L"Минеральная вода"));
+	//items.push_back(ItemData(3, 50, L"Шоколад \"Аленка\""));
+	//items.push_back(ItemData(18, 400, L"Свинина"));
+	//writeData();
 
+	ifstream dataFile(DATA_FILE_NAME);
+	string line, code, price, name;
+	while (getline(dataFile, line)) {
+		istringstream ls(line);
+		getline(ls, code, '|');
+		getline(ls, name, '|');
+		getline(ls, price, '|');
+		wstring wname = fromUTF8(name.c_str());
+		ItemData item(stoi(code), stoi(price), wname.c_str());
+		items.push_back(item);
+	}
 }
+
+
 
 // Глобальные переменные:
 HINSTANCE hInst;                                // текущий экземпляр
@@ -271,6 +307,7 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 							for (int i = 0; i < items.size(); i++) {
 								if (items[i].code == code) {
 									items[i].price = price;
+									writeData();
 									sendResponse(socket, L"2|");
 									return;
 								}
