@@ -30,6 +30,7 @@ string _address("localhost");
 struct addrinfo *_socketAddr = NULL, _hints;
 SOCKET _socket = INVALID_SOCKET;
 WSADATA _wsaData;
+HWND _hAppWnd;
 
 
 // Отправить объявления функций, включенных в этот модуль кода:
@@ -148,11 +149,27 @@ BOOL onConnect() {
 		return FALSE;
 	}
 
+	HMENU hAppMenu = GetMenu(_hAppWnd);
+
+	EnableMenuItem(hAppMenu, IDM_SETTINGS, MF_DISABLED | MF_GRAYED);
+	EnableMenuItem(hAppMenu, IDM_CONNECT, MF_DISABLED | MF_GRAYED);
+	EnableMenuItem(hAppMenu, 1, MF_BYPOSITION | MF_ENABLED);
+	EnableMenuItem(hAppMenu, IDM_DISCONNECT, MF_ENABLED);
+	DrawMenuBar(_hAppWnd);
+
 	return TRUE;
 }
 
 void onDisconnect() {
 	closesocket(_socket);
+
+	HMENU hAppMenu = GetMenu(_hAppWnd);
+	EnableMenuItem(hAppMenu, IDM_SETTINGS, MF_ENABLED);
+	EnableMenuItem(hAppMenu, IDM_CONNECT, MF_ENABLED);
+	EnableMenuItem(hAppMenu, 1, MF_BYPOSITION | MF_DISABLED | MF_GRAYED);
+	EnableMenuItem(hAppMenu, IDM_DISCONNECT, MF_DISABLED | MF_GRAYED);
+	DrawMenuBar(_hAppWnd);
+
 }
 
 void sendRquest(wstring message) {
@@ -375,6 +392,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);
 
+	_hAppWnd = hWnd;
+
 	return TRUE;
 }
 
@@ -448,6 +467,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 		case WM_DESTROY:
+			closesocket(_socket);
 			WSACleanup();
 			PostQuitMessage(0);
 			break;

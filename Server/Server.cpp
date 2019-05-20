@@ -77,8 +77,10 @@ HINSTANCE hInst;                                // текущий экземпл
 WCHAR szTitle[MAX_LOADSTRING];                  // Текст строки заголовка
 WCHAR szWindowClass[MAX_LOADSTRING];            // имя класса главного окна
 HWND _hAppWnd;
+HWND _hLogWnd;
 
 int _port = 18080;
+int _clientCount = 0;
 
 
 // Отправить объявления функций, включенных в этот модуль кода:
@@ -97,6 +99,22 @@ static wchar_t* charToWChar(const char* text)
 	size_t converted;
 	mbstowcs_s(&converted, wText, size, text, size);
 	return wText;
+}
+
+
+void addLogText(const WCHAR* txt) {
+	int oldlen = GetWindowTextLength(_hLogWnd);
+	int newLen = (int)wcslen(txt) + oldlen + 6;
+	WCHAR* newText = new WCHAR[newLen];
+	newText[0] = 0;
+	GetWindowText(_hLogWnd, newText, oldlen+2);
+	if (oldlen != 0)
+		wcscat_s(newText, newLen, L"\r\n");
+	wcscat_s(newText, newLen, txt);
+	SendMessage(_hLogWnd, EM_SETSEL, 0, -1);
+	SendMessage(_hLogWnd, EM_REPLACESEL, FALSE, (LPARAM)newText);
+	SendMessage(_hLogWnd, EM_SCROLLCARET, 0, 0);
+	delete[] newText;
 }
 
 BOOL writeSettings();
@@ -214,6 +232,8 @@ BOOL startServer() {
 	EnableMenuItem(hAppMenu, IDM_SETTINGS, MF_DISABLED);
 	EnableMenuItem(hAppMenu, IDM_START, MF_DISABLED);
 	EnableMenuItem(hAppMenu, IDM_STOP, MF_ENABLED);
+	DrawMenuBar(_hAppWnd);
+	addLogText(L"Сервер запущен.");
 	return TRUE;
 }
 
@@ -223,6 +243,8 @@ BOOL stopServer() {
 	EnableMenuItem(hAppMenu, IDM_SETTINGS, MF_ENABLED);
 	EnableMenuItem(hAppMenu, IDM_START, MF_ENABLED);
 	EnableMenuItem(hAppMenu, IDM_STOP, MF_DISABLED);
+	DrawMenuBar(_hAppWnd);
+	addLogText(L"Сервер остановлен.");
 	return TRUE;
 }
 
@@ -243,6 +265,10 @@ void onWsaAccept(WORD selectError) {
 	}
 
 	OutputDebugString(L"Клиент подключен\r\n");
+	_clientCount++;
+	wstringstream msgStream;
+	msgStream << L"Клиент подключен. Всего клиентов: " << _clientCount;
+	addLogText(msgStream.str().c_str());
 }
 
 void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
@@ -330,6 +356,11 @@ void onWsaEvent(SOCKET socket, WORD event, WORD selectError) {
 		{
 			OutputDebugString(L"Соединение закрыто\r\n");
 			closesocket(socket);
+
+			_clientCount--;
+			wstringstream msgStream;
+			msgStream << L"Клиент отключен. Всего клиентов: " << _clientCount;
+			addLogText(msgStream.str().c_str());
 		}
 		break;
 	}
@@ -365,9 +396,6 @@ void sendResponse(SOCKET socket, wstring message) {
 }
 
 
-
-
-
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
 	_In_ LPWSTR    lpCmdLine,
@@ -377,8 +405,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
 	// TODO: Разместите код здесь.
-
-	readSettings();
 
 
 	// Инициализация глобальных строк
@@ -452,7 +478,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hInst = hInstance; // Сохранить маркер экземпляра в глобальной переменной
 
 	HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+		CW_USEDEFAULT, 0, 900, 700, nullptr, nullptr, hInstance, nullptr);
 
 	if (!hWnd)
 	{
@@ -481,6 +507,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		case WM_CREATE:
 			_hAppWnd = hWnd;
+			
+			HFONT hfDefault;
+			
+			_hLogWnd = CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", L"",
+				ES_READONLY | WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
+				10, 10, 800, 600, hWnd, NULL, GetModuleHandle(NULL), NULL);
+			if (_hLogWnd == NULL)
+				MessageBox(hWnd, L"Could not create edit box.", L"Error", MB_OK | MB_ICONERROR);
+
+			hfDefault = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+			SendMessage(_hLogWnd, WM_SETFONT, (WPARAM)hfDefault, MAKELPARAM(FALSE, 0));
+			readSettings();
 			readData();
 			break;
 		case WM_COMMAND:
