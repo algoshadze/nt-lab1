@@ -526,7 +526,7 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 
 		case WM_COMMAND:
 		{
-			//Полчаем дескриптор комбобокса для проверки источника сообщения
+			//Получаем дескриптор комбобокса для проверки источника сообщения
 			HWND hItemsCombo = GetDlgItem(hDlg, IDCB_ITEMS);
 			HWND hPriceText = GetDlgItem(hDlg, IDT_PRICE);
 			if ((HWND)lParam == hItemsCombo) //Это сообщение от комбо
@@ -560,7 +560,7 @@ INT_PTR CALLBACK PriceChange(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 						MessageBox(hDlg, L"Новая цена успешно установлена", L"Успех", MB_OK);
 						}
 					else {
-						MessageBox(hDlg, L"Новая цена успешно установлена", L"Ошибка операции", MB_OK | MB_ICONERROR);
+						MessageBox(hDlg, L"Не удалось установить новую цену", L"Ошибка операции", MB_OK | MB_ICONERROR);
 					}
 					EndDialog(hDlg, LOWORD(wParam));
 				}
